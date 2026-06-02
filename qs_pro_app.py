@@ -1,4 +1,3 @@
-qs_pro_dark_mode.py
 
 import streamlit as st
 import pandas as pd
@@ -8,6 +7,7 @@ import json
 import io
 from datetime import datetime
 import base64
+import plotly.express as px
 
 # Page configuration
 st.set_page_config(
@@ -17,7 +17,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
+# Use Streamlit's native theming - adapts to light/dark mode automatically
+# No hardcoded background colors that clash with dark mode
+
 st.markdown("""
 <style>
     .main-header {
@@ -34,10 +36,10 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .metric-card {
-        background-color: #f0f2f6;
         border-radius: 10px;
         padding: 1rem;
         border-left: 4px solid #1f4e79;
+        background-color: rgba(128, 128, 128, 0.1);
     }
     .section-header {
         font-size: 1.5rem;
@@ -59,12 +61,35 @@ st.markdown("""
         background-color: #2c6aa6;
     }
     .success-box {
-        background-color: #d4edda;
         border: 1px solid #c3e6cb;
         color: #155724;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
+        background-color: rgba(212, 237, 218, 0.3);
+    }
+    .warning-box {
+        border: 1px solid #ffeeba;
+        color: #856404;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+        background-color: rgba(255, 243, 205, 0.3);
+    }
+    .info-box {
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+        background-color: rgba(209, 236, 241, 0.3);
+    }
+    /* Ensure text is visible in both modes */
+    .metric-card h3 {
+        color: inherit;
+    }
+    .metric-card p {
+        color: inherit;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -217,12 +242,63 @@ if page == "🏠 Home":
         </div>
         """, unsafe_allow_html=True)
 
+    # Capabilities and Limitations
+    st.markdown("---")
+    st.markdown("### ✅ What This Prototype Can Do")
+
+    can_do = [
+        "Upload and display building plans (PDF, JPG, PNG)",
+        "Manual measurement entry with scale calibration",
+        "Auto-calculate floor materials (concrete, screed, tiles)",
+        "Auto-calculate wall materials (bricks, blocks, plaster, paint) with opening deductions",
+        "Auto-calculate roof materials (tiles, membrane, insulation, guttering) with pitch/slope",
+        "Generate full Bill of Quantities with industry-standard rates",
+        "Editable rates and quantities for customization",
+        "Category breakdown: Substructure, Superstructure, Finishes, M&E, External Works",
+        "Export to Excel (multi-sheet workbook)",
+        "Export to CSV for data portability",
+        "Export print-friendly text reports",
+        "Interactive cost distribution charts",
+        "Built-in QS calculators: Area/Volume, Brick/Block, Paint, Concrete Mix, Cost Analysis"
+    ]
+
+    for item in can_do:
+        st.markdown(f"- ✅ {item}")
+
+    st.markdown("### ⚠️ Current Limitations (Phase 1)")
+
+    cannot_do = [
+        "AI auto-scanning of building plans — dimensions must be entered manually by the QS",
+        "Auto-detection of walls, doors, windows from uploaded images — requires computer vision model training",
+        "OCR text extraction from PDF drawings — dimension strings must be read manually",
+        "BIM/IFC model integration — not yet supported",
+        "Live supplier pricing API connection — uses static industry averages",
+        "Multi-currency with live exchange rates — EUR default, manual conversion needed",
+        "Measurement precision relies on user input accuracy — no sub-pixel tools yet",
+        "Mobile app or AR field measurement — web browser only",
+        "Cloud project storage — data is session-based, not saved between visits",
+        "Multi-user collaboration or role-based access — single user per session"
+    ]
+
+    for item in cannot_do:
+        st.markdown(f"- ⚠️ {item}")
+
+    st.markdown("---")
+    st.markdown("<small>QS Pro v1.0 | Phase 1 Prototype | Built for Quantity Surveyors</small>", unsafe_allow_html=True)
+
 # ============================================================
 # PLAN UPLOAD & MEASUREMENT
 # ============================================================
 
 elif page == "📐 Plan Upload & Measurement":
     st.markdown('<div class="section-header">📐 Plan Upload & Measurement</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="info-box">
+    <strong>How it works:</strong> Upload your building plan, then manually enter dimensions from the drawing. 
+    The app will auto-calculate all material quantities. AI auto-scanning is planned for Phase 2.
+    </div>
+    """, unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4 = st.tabs(["📤 Upload Plan", "📏 Floor Measurements", "🧱 Wall Measurements", "🏠 Roof Measurements"])
 
@@ -248,7 +324,7 @@ elif page == "📐 Plan Upload & Measurement":
                     pixel_length = st.number_input("Measured in pixels (use image editor or estimate)", min_value=1, value=100, step=1)
 
                 if pixel_length > 0:
-                    scale_factor = known_length / pixel_length  # meters per pixel
+                    scale_factor = known_length / pixel_length
                     st.session_state.project_data['scale_factor'] = scale_factor
                     st.success(f"Scale calibrated: {scale_factor:.4f} meters per pixel")
                     st.info("💡 Tip: Use the measurement tools below to calculate areas and lengths from your plan.")
@@ -301,9 +377,9 @@ elif page == "📐 Plan Upload & Measurement":
             # Auto-calculate materials
             st.markdown("### Auto-Calculated Floor Materials")
 
-            concrete_vol = total_floor_area * 0.15  # 150mm thick slab assumption
-            screed_vol = total_floor_area * 0.05     # 50mm screed
-            tiles_area = total_floor_area * 1.10     # 10% wastage
+            concrete_vol = total_floor_area * 0.15
+            screed_vol = total_floor_area * 0.05
+            tiles_area = total_floor_area * 1.10
 
             col1, col2, col3 = st.columns(3)
             col1.metric("Concrete (150mm slab)", f"{concrete_vol:.2f} m³")
@@ -365,11 +441,10 @@ elif page == "📐 Plan Upload & Measurement":
             # Auto-calculate materials
             st.markdown("### Auto-Calculated Wall Materials")
 
-            # Brick calculation: 60 bricks per m² for single leaf, 120 for cavity
-            brick_count = total_wall_area * 60  # Simplified single leaf
-            block_count = total_wall_area * 10  # 10 blocks per m²
-            mortar_vol = total_wall_area * 0.015  # 15mm mortar
-            plaster_area = total_wall_area * 2     # Both sides
+            brick_count = total_wall_area * 60
+            block_count = total_wall_area * 10
+            mortar_vol = total_wall_area * 0.015
+            plaster_area = total_wall_area * 2
             paint_area = plaster_area
 
             col1, col2, col3, col4 = st.columns(4)
@@ -400,13 +475,10 @@ elif page == "📐 Plan Upload & Measurement":
             submitted = st.form_submit_button("➕ Add Roof Measurement")
 
             if submitted:
-                # Calculate actual roof area based on pitch
                 pitch_rad = np.radians(pitch)
                 slope_factor = 1 / np.cos(pitch_rad) if pitch > 0 else 1
                 actual_area = plan_area * slope_factor
-
-                # Add overhang area (approximate)
-                perimeter = np.sqrt(plan_area) * 4  # Rough square assumption
+                perimeter = np.sqrt(plan_area) * 4
                 overhang_area = perimeter * overhang
                 total_roof_area = actual_area + overhang_area
 
@@ -433,11 +505,11 @@ elif page == "📐 Plan Upload & Measurement":
             # Auto-calculate materials
             st.markdown("### Auto-Calculated Roof Materials")
 
-            tiles_area = total_roof * 1.10  # 10% wastage
-            battens_length = total_roof * 2.5  # Approximate
+            tiles_area = total_roof * 1.10
+            battens_length = total_roof * 2.5
             membrane_area = total_roof * 1.05
             insulation_area = total_roof
-            gutter_length = np.sqrt(total_roof) * 4  # Rough estimate
+            gutter_length = np.sqrt(total_roof) * 4
 
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Roof Tiles (incl. wastage)", f"{tiles_area:.2f} m²")
@@ -452,10 +524,8 @@ elif page == "📐 Plan Upload & Measurement":
 elif page == "📊 BOQ Generator":
     st.markdown('<div class="section-header">📊 Bill of Quantities Generator</div>', unsafe_allow_html=True)
 
-    # Build BOQ from measurements
     boq_items = []
 
-    # Floor items
     if st.session_state.floor_measurements:
         df_floors = pd.DataFrame(st.session_state.floor_measurements)
         total_floor = df_floors['area'].sum()
@@ -469,7 +539,6 @@ elif page == "📊 BOQ Generator":
             {'item_no': 'B.1.2', 'description': 'Floor tiles supply and fix', 'unit': 'm²', 'quantity': total_floor * 1.10, 'rate': 35.00, 'category': 'Superstructure - Floors'},
         ])
 
-    # Wall items
     if st.session_state.wall_measurements:
         df_walls = pd.DataFrame(st.session_state.wall_measurements)
         total_net_wall = df_walls['net_area'].sum()
@@ -484,7 +553,6 @@ elif page == "📊 BOQ Generator":
             {'item_no': 'B.2.5', 'description': 'Internal doors (paint grade)', 'unit': 'nr', 'quantity': max(1, int(total_openings * 0.4 / 2)), 'rate': 350.00, 'category': 'Superstructure - Openings'},
         ])
 
-    # Roof items
     if st.session_state.roof_measurements:
         df_roofs = pd.DataFrame(st.session_state.roof_measurements)
         total_roof = df_roofs['total_area'].sum()
@@ -497,7 +565,6 @@ elif page == "📊 BOQ Generator":
             {'item_no': 'B.3.5', 'description': 'Guttering and downpipes (PVC)', 'unit': 'm', 'quantity': np.sqrt(total_roof) * 4, 'rate': 25.00, 'category': 'External Works'},
         ])
 
-    # M&E approximates (based on floor area)
     if st.session_state.floor_measurements:
         df_floors = pd.DataFrame(st.session_state.floor_measurements)
         total_floor = df_floors['area'].sum()
@@ -510,17 +577,14 @@ elif page == "📊 BOQ Generator":
             {'item_no': 'C.2.2', 'description': 'Plumbing (2nd fix - sanitaryware)', 'unit': 'm²', 'quantity': total_floor, 'rate': 42.00, 'category': 'M&E - Plumbing'},
         ])
 
-    # Preliminaries & margin
     if boq_items:
         total_prelim = sum(item['quantity'] * item['rate'] for item in boq_items) * 0.08
         boq_items.append({'item_no': 'D.1.1', 'description': 'Preliminaries (8%)', 'unit': 'sum', 'quantity': 1, 'rate': total_prelim, 'category': 'Preliminaries'})
 
-    # Display BOQ
     if boq_items:
         df_boq = pd.DataFrame(boq_items)
         df_boq['amount'] = df_boq['quantity'] * df_boq['rate']
 
-        # Allow rate editing
         st.markdown("### Review and Adjust Rates")
         st.write("Rates are pre-populated with industry averages. Adjust as needed for your project.")
 
@@ -534,12 +598,10 @@ elif page == "📊 BOQ Generator":
             num_rows="dynamic"
         )
 
-        # Recalculate with edited rates
         edited_df['amount'] = edited_df['quantity'] * edited_df['rate']
 
         st.markdown("### Bill of Quantities Summary")
 
-        # Category breakdown
         category_summary = edited_df.groupby('category')['amount'].sum().reset_index()
         category_summary = category_summary.sort_values('amount', ascending=False)
 
@@ -556,7 +618,6 @@ elif page == "📊 BOQ Generator":
                 cost_per_m2 = total_cost / total_floor
                 st.metric("Cost per m²", f"€{cost_per_m2:.2f}")
 
-        # Store for reports
         st.session_state.project_data['boq_items'] = edited_df.to_dict('records')
         st.session_state.project_data['total_cost'] = total_cost
 
@@ -620,9 +681,8 @@ elif page == "🧮 Calculators":
         with col2:
             bond = st.selectbox("Bond", ["Stretcher", "English", "Flemish", "Stack"])
 
-        # Standard calculations
         bricks_per_m2 = 60 if brick_size == "Standard (215x102.5x65mm)" else 50
-        mortar_per_m2 = 0.015  # m³
+        mortar_per_m2 = 0.015
 
         total_bricks = wall_area * bricks_per_m2
         wastage = total_bricks * 0.08
@@ -635,8 +695,7 @@ elif page == "🧮 Calculators":
         col2.metric("With 8% Wastage", f"{total_with_wastage:,.0f}")
         col3.metric("Mortar (m³)", f"{mortar_vol:.3f}")
 
-        # Cement and sand breakdown
-        cement_bags = mortar_vol * 6  # approx 6 bags per m³
+        cement_bags = mortar_vol * 6
         sand_m3 = mortar_vol * 0.8
 
         st.markdown("### Material Breakdown")
@@ -725,7 +784,6 @@ elif page == "📈 Reports & Export":
     else:
         st.subheader("Project Summary Report")
 
-        # Project header
         st.markdown(f"""
         ### {st.session_state.project_data['project_name'] or 'Untitled Project'}
         **Client:** {st.session_state.project_data['client'] or 'N/A'}  
@@ -737,7 +795,6 @@ elif page == "📈 Reports & Export":
 
         st.markdown("---")
 
-        # BOQ Table
         df_report = pd.DataFrame(st.session_state.project_data['boq_items'])
         if 'amount' not in df_report.columns:
             df_report['amount'] = df_report['quantity'] * df_report['rate']
@@ -745,32 +802,26 @@ elif page == "📈 Reports & Export":
         st.dataframe(df_report[['item_no', 'description', 'unit', 'quantity', 'rate', 'amount', 'category']], 
                      use_container_width=True)
 
-        # Summary
         total = df_report['amount'].sum()
         st.metric("Total Project Cost", f"€{total:,.2f}")
 
-        # Category pie chart
         st.markdown("### Cost Breakdown by Category")
         category_data = df_report.groupby('category')['amount'].sum().reset_index()
 
-        import plotly.express as px
         fig = px.pie(category_data, values='amount', names='category', 
                      title='Cost Distribution by Category',
                      color_discrete_sequence=px.colors.sequential.Blues_r)
         st.plotly_chart(fig, use_container_width=True)
 
-        # Export options
         st.markdown("### Export Options")
 
         col1, col2 = st.columns(2)
 
         with col1:
-            # Excel export
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_report.to_excel(writer, sheet_name='BOQ', index=False)
 
-                # Summary sheet
                 summary_data = {
                     'Project Name': [st.session_state.project_data['project_name']],
                     'Client': [st.session_state.project_data['client']],
@@ -792,7 +843,6 @@ elif page == "📈 Reports & Export":
             )
 
         with col2:
-            # CSV export
             csv = df_report.to_csv(index=False)
             st.download_button(
                 label="📥 Download CSV",
@@ -801,7 +851,6 @@ elif page == "📈 Reports & Export":
                 mime="text/csv"
             )
 
-        # Print-friendly report
         st.markdown("---")
         st.markdown("### Print-Friendly Report")
 
@@ -841,4 +890,4 @@ This is a computer-generated document.
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("<small>QS Pro v1.0 | Built for Quantity Surveyors</small>", unsafe_allow_html=True)
+st.sidebar.markdown("<small>QS Pro v1.0 | Cloud Ready | Built for Quantity Surveyors</small>", unsafe_allow_html=True)
